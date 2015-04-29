@@ -1,62 +1,47 @@
 module Language.Dove.Syntax
-  ( Expr (..)
-  , UniOp (..)
-  , BinOp (..)
-  , let'
-  , forAll
-  , not'
-  , (&&.)
-  , (||.)
-  , implies
-  , unit
-  , true
-  , false
-  , if'
-  , length'
-  , isArray
-  , isInt
-  , (==.)
-  , (<.)
-  , (<=.)
-  , (>.)
-  , (>=.)
-  , mod'
+  ( Expr    (..)
+  , Literal (..)
+  , Unary   (..)
+  , Binary  (..)
+  , Ternary (..)
+  , Name
   ) where
 
 import Data.List
 import Text.Printf
 
+type Name = String
+
 data Expr
-  = Var           String
-  | ForAll        String Expr
-  | Let           String Expr Expr
-  | Record        [(String, Expr)]
-  | RecordOverlay Expr Expr       -- overlay first over second
-  | RecordProject Expr String
+  = Var           Name
+  | Literal       Literal
+  | ForAll        Name Expr
+  | Let           Name Expr Expr
+  | Record        [(Name, Expr)]
+  | RecordProject Expr Name
   | Array         [Expr]
-  | ArrayAppend   Expr Expr
-  | ArrayProject  Expr Expr
-  | ArrayUpdate   Expr Expr Expr  -- index newValue oldArray
-  | UniOp         UniOp Expr
-  | BinOp         BinOp Expr Expr
-  | If            Expr Expr Expr
-  | Unit
-  | Bool          Bool
-  | Integer       Integer
+  | Unary         Unary   Expr
+  | Binary        Binary  Expr Expr
+  | Ternary       Ternary Expr Expr Expr
   | Comment       String Expr
   deriving Eq
 
-data UniOp
-  = Not
-  | Length
+data Literal = Unit | Bool Bool | Integer Integer deriving Eq
+
+data Unary
+  = IsUnit
+  | IsBool
+  | IsInteger
+  | IsArray
+  | IsRecord
+  | ArrayLength
+  | Not
   | Negate
   | Abs
   | Signum
-  | IsArray
-  | IsInt
   deriving Eq
 
-data BinOp
+data Binary
   = And
   | Or
   | Implies
@@ -69,84 +54,71 @@ data BinOp
   | Sub
   | Mul
   | Mod
+  | RecordOverlay  -- ^ Overlay first over second.
+  | ArrayAppend
+  | ArrayProject   -- ^ Array, index.
+  deriving Eq
+
+data Ternary
+  = If
+  | ArrayUpdate  -- ^ Index, newValue, oldArray.
   deriving Eq
 
 instance Show Expr where
   show a = case a of
     Var           a     -> a
+    Literal       Unit  -> "()"
+    Literal       (Bool True)  -> "true"
+    Literal       (Bool False) -> "false"
+    Literal       (Integer a)  -> show a
     ForAll        a b   -> printf "forall %s in\n%s" a (show b)
+    Let           a b c -> printf "let %s = %s in\n%s" a (show b) (show c)
     Record        a     -> printf "{%s}" $ intercalate ", " [ a ++ " = " ++ show b | (a, b) <- a ]
-    RecordOverlay a b   -> printf "(overlay %s %s)" (show a) (show b)
     RecordProject a b   -> printf "%s.%s" (show a) b
     Array         a     -> printf "[%s]" $ intercalate ", " $ map show a
-    ArrayAppend   a b   -> printf "(%s ++ %s)" (show a) (show b)
-    ArrayUpdate   a b c -> printf "(update %s %s %s)" (show a) (show b) (show c)
-    ArrayProject  a b   -> printf "%s[%s]"  (show a) (show b)
-    Let           a b c -> printf "let %s = %s in\n%s" a (show b) (show c)
-    UniOp         a b   -> printf "(%s %s)" (show a) (show b)
-    BinOp         a b c -> printf "(%s %s %s)" (show b) (show a) (show c)
-    If            a b c -> printf "(if %s then %s else %s)" (show a) (show b) (show c)
-    Unit                -> "()"
-    Bool          a     -> if a then "true" else "false"
-    Integer       a     -> show a
+    Unary         a b   -> printf "(%s %s)" (show a) (show b)
+    Binary        a b c -> printf "(%s %s %s)" (show a) (show b) (show c)
+    Ternary       If          a b c -> printf "(if %s then %s else %s)" (show a) (show b) (show c)
+    Ternary       ArrayUpdate a b c -> printf "(arrayUpdate %s %s %s)"  (show a) (show b) (show c)
     Comment       a b   -> "-- " ++ a ++ "\n" ++ show b
 
-instance Show UniOp where
+instance Show Unary where
   show a = case a of
-    Not     -> "not"
-    Length  -> "arrayLength"
-    Negate  -> "intNegate"
-    Abs     -> "intAbs"
-    Signum  -> "intSignum"
-    IsArray -> "isArray"
-    IsInt   -> "isInt"
+    IsUnit      -> "isUnit"
+    IsBool      -> "isBool"
+    IsInteger   -> "isInteger"
+    IsArray     -> "isArray"
+    IsRecord    -> "isRecord"
+    ArrayLength -> "arrayLength"
+    Not         -> "not"
+    Negate      -> "negate"
+    Abs         -> "abs"
+    Signum      -> "signum"
 
-instance Show BinOp where
+instance Show Binary where
   show a = case a of
-    And     -> "and"
-    Or      -> "or"
-    Implies -> "implies"
-    Eq      -> "eq"
-    Lt      -> "lt"
-    Le      -> "le"
-    Gt      -> "gt"
-    Ge      -> "ge"
-    Add     -> "+"
-    Sub     -> "-"
-    Mul     -> "*"
-    Mod     -> "mod"
+    And           -> "and"
+    Or            -> "or"
+    Implies       -> "implies"
+    Eq            -> "eq"
+    Lt            -> "lt"
+    Le            -> "le"
+    Gt            -> "gt"
+    Ge            -> "ge"
+    Add           -> "+"
+    Sub           -> "-"
+    Mul           -> "*"
+    Mod           -> "mod"
+    RecordOverlay -> "recordOverlay"
+    ArrayAppend   -> "++"
+    ArrayProject  -> "!"
 
 instance Num Expr where
-  (+)    = BinOp Add
-  (-)    = BinOp Sub
-  (*)    = BinOp Mul
-  negate = UniOp Negate
-  abs    = UniOp Abs
-  signum = UniOp Signum
-  fromInteger = Integer
-
-let' = Let
-
-forAll :: [String] -> Expr -> Expr
-forAll a b = case a of
-  [] -> b
-  a : rest -> ForAll a $ forAll rest b
-
-not' = UniOp Not
-(&&.) = BinOp And
-(||.) = BinOp Or
-implies = BinOp Implies
-unit  = Unit
-true  = Bool True
-false = Bool False
-if' = If
-length' = UniOp Length
-(==.) = BinOp Eq
-(<.)  = BinOp Lt
-(<=.) = BinOp Le
-(>.)  = BinOp Gt
-(>=.) = BinOp Ge
-mod' = BinOp Mod
-isArray = UniOp IsArray
-isInt = UniOp IsInt
+  (+)         = Binary Add
+  (-)         = Binary Sub
+  (*)         = Binary Mul
+  negate      = Unary Negate
+  abs         = Unary Abs
+  signum      = Unary Signum
+  fromInteger = Literal . Integer
 

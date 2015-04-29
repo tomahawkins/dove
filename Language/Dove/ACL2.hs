@@ -32,14 +32,17 @@ acl2 a = case a of
   Record a -> A.list [ A.cons (A.string a) (expr b) | (a, b) <- a ]
   RecordOverlay a b  -> A.append (expr a) (expr b)
   RecordProject a b -> A.cdr $ A.assoc (A.string b) (expr a)
-  UniOp op a -> case op of
+  Unary op a -> case op of
+    IsUnit    -> A.equal (A.nil) (expr a)
+    IsBool    -> A.or' (A.equal A.nil (expr a)) (A.equal A.t (expr a))
+    IsInteger -> A.integerp $ expr a
+    IsArray   -> A.consp $ expr a   -- Arrays can't be zero length.  A.or' (A.equal A.nil $ expr a) (A.consp $ expr a)
+    IsRecord  -> undefined          -- XXX How to differentiate between arrays and records?  Perhaps values need to be boxed.
     Not     -> A.not' $ expr a
     Length  -> A.len  $ expr a
     Negate  -> 0 - (expr a)
     Abs     -> A.if' (expr a A.>=. 0) (expr a) (0 - (expr a))
     Signum  -> A.if' (expr a A.>. 0) 1 $ A.if' (expr a A.<. 0) (-1) 0
-    IsArray -> A.consp $ expr a   -- Arrays can't be zero length.  A.or' (A.equal A.nil $ expr a) (A.consp $ expr a)
-    IsInt   -> A.integerp $ expr a
   BinOp op a b -> op' (expr a) (expr b)
     where
     op' = case op of

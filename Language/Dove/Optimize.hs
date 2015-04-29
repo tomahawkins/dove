@@ -79,8 +79,9 @@ vars a = case a of
   Let    a b c -> vars b ++ [ v | v <- vars c, v /= a ]
   ForAll a b   -> [ v | v <- vars b, v /= a ]
   If a b c -> vars a ++ vars b ++ vars c
-  UniOp _ a -> vars a
-  BinOp _ a b -> vars a ++ vars b
+  Unary _ a -> vars a
+  Binary _ a b -> vars a ++ vars b
+  Ternary _ a b c -> vars a ++ vars b ++ vars c
   Unit      -> []
   Bool    _ -> []
   Integer _ -> []

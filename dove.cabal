@@ -18,8 +18,9 @@ library
     acl2     >= 0.0.1 && < 0.2
   exposed-modules:
     Language.Dove
-    Language.Dove.ACL2
-    Language.Dove.Optimize
+    --Language.Dove.ACL2
+    -- Language.Dove.Optimize
+    Language.Dove.Language
     Language.Dove.Syntax
   ghc-options: -W
 
